@@ -1,9 +1,11 @@
 {
   "name": "votingMachine",
-  "description": "count and record psoted votes",
+  "description": "count and record posted votes",
   "version": "0.0.1",
   "author": "Ben Boyle <ben.m.boyle@gmail.com>",
   "dependencies": {
-    "express": "3.x"
+    "express": "3.x",
+    "http"   : "*", 
+    "sockjs" : "*"
   }
 }
