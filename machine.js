@@ -10,19 +10,24 @@ var tally   = {}; // object to provide a live tally of the votes
 var log = fs.createWriteStream("audit.log", {flags:'a'});
 
 var connectedUsersCount = 0;
+var openConnections = {};
 
-sendTally = function(conn) {
+function sendTally(conn) {
     conn.write(JSON.stringify(tally));
 }
 
+function broadcastTally() {
+  Object.keys(openConnections).forEach(function(id) {
+    sendTally(openConnections[id]);
+  });
+}
 
 var sockjs_echo = sockjs.createServer(sockjs_opts);
 
 sockjs_echo.on('connection', function(conn) {
   console.log("connected " + conn.id);
   
-  connectedUsersCount++;
-  
+  openConnections[conn.id] = conn;
   // on connect, send an initial tally.
   sendTally(conn);
   
@@ -33,11 +38,12 @@ sockjs_echo.on('connection', function(conn) {
     // if we're worried about client misbehavior. But for now we'll be
     // permissive.
     handleVote(conn.id, conn.remoteAddress, data);
+    broadcastTally();
   });
   
   conn.on('end', function() {   // at end 
     console.log("disconnected " + conn.id);
-    connectedUsersCount--;
+    delete openConnections[conn.id];
   });  
 });
 
