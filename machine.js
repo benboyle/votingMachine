@@ -35,13 +35,15 @@ if (process.hasOwnProperty('send')) {
   process.send('online');
 };
 // handle a shutdown message
-process.on('message', function(message) {
-  if (message === 'shutdown') {
-    log.on("finish", function() {
-      process.exit(0);
-    });
+process.on('SIGINT', function(message) {
+    console.log("shutting down");
     log.end();
-  };
+    
+    // this is bad form but for some reason the log doens't always issue
+    // the 'end' or 'finish' events after you ask it to end. So give it a 
+    // bit of time and then end the process.
+    setTimeout(function() {
+      process.exit(0)}, 200);
 });
 
 // do the express stuff to start up app
