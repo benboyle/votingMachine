@@ -49,15 +49,19 @@ app.use(express.static(__dirname + '/public'));
 
 // handle post to /vote
 app.post('/vote', function(req, res){
-   var thisVote=req.body; // accept incoming payload
-   thisVote.timeReceived=new Date; // add a timestamp
-   thisVote.reqip = req.ip;  // grab the ip address
-   // keep running totals in tally object fix not to if then else
-   tally[thisVote.vote]=(tally.hasOwnProperty(thisVote.vote))?tally[thisVote.vote]+1:1;
-   // save the output to audit log
-   fs.appendFile('audit.log',JSON.stringify(thisVote)+'\n', function (err) {
-       if (err) throw err});
+   handleVote("posted", req.ip, req.body.vote);
    res.end() // done
 });
+
+function handleVote(id, ip, voteKey) {
+    tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
+    console.log("TALLY: " + JSON.stringify(tally));
+    
+    var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
+    fs.appendFile('audit.log',JSON.stringify(vote)+'\n', function (err)
+      {
+        if (err) throw err
+      });
+}
 
 server.listen(8080);
