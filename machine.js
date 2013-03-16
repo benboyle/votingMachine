@@ -7,24 +7,43 @@ var sockjs_opts = {sockjs_url: "http://cdn.sockjs.org/sockjs-0.3.min.js"};
 
 var tally   = {}; // object to provide a live tally of the votes
 
-sendTally = function(conn) {
+var log = fs.createWriteStream("audit.log", {flags:'a'});
+
+var connectedUsersCount = 0;
+var openConnections = {};
+
+function sendTally(conn) {
     conn.write(JSON.stringify(tally));
 }
-var sockjs_echo = sockjs.createServer(sockjs_opts);
-sockjs_echo.on('connection', function(conn) {
-  var sendTallyId = "";
-  conn.on('data', function(seconds) { // figure out how often to update listener
-    if (sendTallyId != "") {  // do we have a timed task already
-        clearInterval(sendTallyId)
-    }
-    seconds=(seconds=="" || isNaN(seconds))?5:seconds; // 5 seconds on invalid interval
-    sendTally(conn);  // send the initial data
-    sendTallyId=setInterval(sendTally, seconds*1000, conn); // start timed task
+
+function broadcastTally() {
+  Object.keys(openConnections).forEach(function(id) {
+    sendTally(openConnections[id]);
   });
+}
+
+var sockjs_tally = sockjs.createServer(sockjs_opts);
+
+sockjs_tally.on('connection', function(conn) {
+  console.log("connected " + conn.id);
+  
+  openConnections[conn.id] = conn;
+  // on connect, send an initial tally.
+  sendTally(conn);
+  
+  conn.on('data', function(data) {
+    // any string that comes in we will treat as a vote for that item.
+    // it's up to clients to send sensible strings for now.
+    // we might want to add a constraint that the key exist aleady in tally,
+    // if we're worried about client misbehavior. But for now we'll be
+    // permissive.
+    handleVote(conn.id, conn.remoteAddress, data);
+    broadcastTally();
+  });
+  
   conn.on('end', function() {   // at end 
-    if (sendTallyId != "") {
-        clearInterval(sendTallyId) // cancel timed task
-    };
+    console.log("disconnected " + conn.id);
+    delete openConnections[conn.id];
   });  
 });
 
@@ -33,31 +52,40 @@ if (process.hasOwnProperty('send')) {
   process.send('online');
 };
 // handle a shutdown message
-process.on('message', function(message) {
-  if (message === 'shutdown') {
-    process.exit(0);
-  };
+process.on('SIGINT', function(message) {
+    console.log("shutting down");
+    log.end();
+    
+    // this is bad form but for some reason the log doens't always issue
+    // the 'end' or 'finish' events after you ask it to end. So give it a 
+    // bit of time and then end the process.
+    setTimeout(function() {
+      process.exit(0)}, 200);
 });
 
 // do the express stuff to start up app
 app = express();
 var server = http.createServer(app);
-sockjs_echo.installHandlers(server, {prefix:'/echo'});
+sockjs_tally.installHandlers(server, {prefix:'/tally'});
 
 app.use(express.bodyParser());
 app.use(express.static(__dirname + '/public'));
 
 // handle post to /vote
 app.post('/vote', function(req, res){
-   var thisVote=req.body; // accept incoming payload
-   thisVote.timeReceived=new Date; // add a timestamp
-   thisVote.reqip = req.ip;  // grab the ip address
-   // keep running totals in tally object fix not to if then else
-   tally[thisVote.vote]=(tally.hasOwnProperty(thisVote.vote))?tally[thisVote.vote]+1:1;
-   // save the output to audit log
-   fs.appendFile('audit.log',JSON.stringify(thisVote)+'\n', function (err) {
-       if (err) throw err});
+   handleVote("posted", req.ip, req.body.vote);
    res.end() // done
 });
+
+function handleVote(id, ip, voteKey) {
+    tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
+    console.log("TALLY: " + JSON.stringify(tally));
+    
+    var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
+    log.write(JSON.stringify(vote)+'\n','utf8', function (err)
+      {
+        if (err) throw err
+      });
+}
 
 server.listen(8080);
