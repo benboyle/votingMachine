@@ -22,9 +22,9 @@ function broadcastTally() {
   });
 }
 
-var sockjs_echo = sockjs.createServer(sockjs_opts);
+var sockjs_tally = sockjs.createServer(sockjs_opts);
 
-sockjs_echo.on('connection', function(conn) {
+sockjs_tally.on('connection', function(conn) {
   console.log("connected " + conn.id);
   
   openConnections[conn.id] = conn;
@@ -66,7 +66,7 @@ process.on('SIGINT', function(message) {
 // do the express stuff to start up app
 app = express();
 var server = http.createServer(app);
-sockjs_echo.installHandlers(server, {prefix:'/echo'});
+sockjs_tally.installHandlers(server, {prefix:'/tally'});
 
 app.use(express.bodyParser());
 app.use(express.static(__dirname + '/public'));
