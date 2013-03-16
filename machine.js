@@ -9,24 +9,35 @@ var tally   = {}; // object to provide a live tally of the votes
 
 var log = fs.createWriteStream("audit.log", {flags:'a'});
 
+var connectedUsersCount = 0;
+
 sendTally = function(conn) {
     conn.write(JSON.stringify(tally));
 }
+
+
 var sockjs_echo = sockjs.createServer(sockjs_opts);
+
 sockjs_echo.on('connection', function(conn) {
-  var sendTallyId = "";
-  conn.on('data', function(seconds) { // figure out how often to update listener
-    if (sendTallyId != "") {  // do we have a timed task already
-        clearInterval(sendTallyId)
-    }
-    seconds=(seconds=="" || isNaN(seconds))?5:seconds; // 5 seconds on invalid interval
-    sendTally(conn);  // send the initial data
-    sendTallyId=setInterval(sendTally, seconds*1000, conn); // start timed task
+  console.log("connected " + conn.id);
+  
+  connectedUsersCount++;
+  
+  // on connect, send an initial tally.
+  sendTally(conn);
+  
+  conn.on('data', function(data) {
+    // any string that comes in we will treat as a vote for that item.
+    // it's up to clients to send sensible strings for now.
+    // we might want to add a constraint that the key exist aleady in tally,
+    // if we're worried about client misbehavior. But for now we'll be
+    // permissive.
+    handleVote(conn.id, conn.remoteAddress, data);
   });
+  
   conn.on('end', function() {   // at end 
-    if (sendTallyId != "") {
-        clearInterval(sendTallyId) // cancel timed task
-    };
+    console.log("disconnected " + conn.id);
+    connectedUsersCount--;
   });  
 });
 
