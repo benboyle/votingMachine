@@ -7,6 +7,8 @@ var sockjs_opts = {sockjs_url: "http://cdn.sockjs.org/sockjs-0.3.min.js"};
 
 var tally   = {}; // object to provide a live tally of the votes
 
+var log = fs.createWriteStream("audit.log", {flags:'a'});
+
 sendTally = function(conn) {
     conn.write(JSON.stringify(tally));
 }
@@ -35,7 +37,10 @@ if (process.hasOwnProperty('send')) {
 // handle a shutdown message
 process.on('message', function(message) {
   if (message === 'shutdown') {
-    process.exit(0);
+    log.on("finish", function() {
+      process.exit(0);
+    });
+    log.end();
   };
 });
 
@@ -58,7 +63,7 @@ function handleVote(id, ip, voteKey) {
     console.log("TALLY: " + JSON.stringify(tally));
     
     var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
-    fs.appendFile('audit.log',JSON.stringify(vote)+'\n', function (err)
+    log.write(JSON.stringify(vote)+'\n','utf8', function (err)
       {
         if (err) throw err
       });
