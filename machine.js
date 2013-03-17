@@ -17,9 +17,7 @@ function sendTally(conn) {
 }
 
 function broadcastTally() {
-  console.log('on the air');
   Object.keys(openConnections).forEach(function(id) {
-    console.dir(id);
     sendTally(openConnections[id]);
   });
 }
