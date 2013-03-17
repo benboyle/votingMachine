@@ -17,7 +17,9 @@ function sendTally(conn) {
 }
 
 function broadcastTally() {
+  console.log('on the air');
   Object.keys(openConnections).forEach(function(id) {
+    console.dir(id);
     sendTally(openConnections[id]);
   });
 }
@@ -38,7 +40,7 @@ sockjs_tally.on('connection', function(conn) {
     // if we're worried about client misbehavior. But for now we'll be
     // permissive.
     handleVote(conn.id, conn.remoteAddress, data);
-    broadcastTally();
+    
   });
   
   conn.on('end', function() {   // at end 
@@ -80,7 +82,7 @@ app.post('/vote', function(req, res){
 function handleVote(id, ip, voteKey) {
     tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
     console.log("TALLY: " + JSON.stringify(tally));
-    
+    broadcastTally();
     var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
     log.write(JSON.stringify(vote)+'\n','utf8', function (err)
       {
