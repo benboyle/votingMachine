@@ -33,14 +33,24 @@
       }
     </style>
 </head><body lang="en">
-    <h1>SockJS Express example</h1>
+    <h1>votingMachine example</h1>
 
     <div id="first" class="box">
       <div></div>
       <form><input autocomplete="off" value="Type here..."></input></form>
     </div>
-
+    <div>
+    <button>john</button>
+    <button>paul</button>
+    <button>ringo</button>
+    <button>george</button>
+    <button>none</button>
+    </div>
     <script>
+     $(function() {
+        $("button").click(function(){
+        sockjs.send($(this).text());
+        })
         var sockjs_url = '/tally';
         var sockjs = new SockJS(sockjs_url);
         $('#first input').focus();
@@ -56,7 +66,10 @@
             div.scrollTop(div.scrollTop()+10000);
         };
 
-        sockjs.onopen    = function()  {print('[*] open', sockjs.protocol);};
+        sockjs.onopen    = function()  {
+          print('[*] open', sockjs.protocol);
+          sockjs.send('_openned');
+        };
         sockjs.onmessage = function(e) {print('[.] message', e.data);};
         sockjs.onclose   = function()  {print('[*] close');};
 
@@ -66,6 +79,6 @@
             inp.val('');
             return false;
         });
-
+ })
     </script>
 </body></html>
