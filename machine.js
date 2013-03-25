@@ -12,13 +12,13 @@ var log = fs.createWriteStream("audit.log", {flags:'a'});
 var connectedUsersCount = 0;
 var openConnections = {};
 
-function sendTally(conn) {
-    conn.write(JSON.stringify(tally));
+function sendVote(conn, vote) {
+	conn.write(JSON.stringify(vote));
 }
 
-function broadcastTally() {
+function broadcastVote(vote) {
   Object.keys(openConnections).forEach(function(id) {
-    sendTally(openConnections[id]);
+    sendVote(openConnections[id], vote);
   });
 }
 
@@ -28,8 +28,6 @@ sockjs_tally.on('connection', function(conn) {
   console.log("connected " + conn.id);
   
   openConnections[conn.id] = conn;
-  // on connect, send an initial tally.
-  sendTally(conn);
   
   conn.on('data', function(data) {
     // any string that comes in we will treat as a vote for that item.
@@ -38,7 +36,6 @@ sockjs_tally.on('connection', function(conn) {
     // if we're worried about client misbehavior. But for now we'll be
     // permissive.
     handleVote(conn.id, conn.remoteAddress, data);
-    
   });
   
   conn.on('end', function() {   // at end 
@@ -80,8 +77,11 @@ app.post('/vote', function(req, res){
 function handleVote(id, ip, voteKey) {
     tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
     console.log("TALLY: " + JSON.stringify(tally));
-    broadcastTally();
+		
     var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
+		
+		broadcastVote(vote);
+		
     log.write(JSON.stringify(vote)+'\n','utf8', function (err)
       {
         if (err) throw err
