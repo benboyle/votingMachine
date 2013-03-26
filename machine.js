@@ -1,4 +1,5 @@
 // collect votes
+"use strict";
 var fs      = require('fs');
 var express = require('express');
 var http    = require('http');
@@ -7,7 +8,9 @@ var sockjs_opts = {sockjs_url: "http://cdn.sockjs.org/sockjs-0.3.min.js"};
 
 var tally   = {}; // object to provide a live tally of the votes
 
-var log = fs.createWriteStream("audit.log", {flags:'a'});
+var auditFilename = 'audit.log';
+
+var log = fs.createWriteStream(auditFilename, {flags:'a'});
 
 var connectedUsersCount = 0;
 var openConnections = {};
@@ -47,7 +50,7 @@ sockjs_tally.on('connection', function(conn) {
 // let any monitoring software know we are up
 if (process.hasOwnProperty('send')) {
   process.send('online');
-};
+}
 // handle a shutdown message
 process.on('SIGINT', function(message) {
     console.log("shutting down");
@@ -57,11 +60,13 @@ process.on('SIGINT', function(message) {
     // the 'end' or 'finish' events after you ask it to end. So give it a 
     // bit of time and then end the process.
     setTimeout(function() {
-      process.exit(0)}, 200);
+      process.exit(0);
+      },
+      200);
 });
 
 // do the express stuff to start up app
-app = express();
+var app = express();
 var server = http.createServer(app);
 sockjs_tally.installHandlers(server, {prefix:'/tally'});
 
@@ -71,20 +76,26 @@ app.use(express.static(__dirname + '/public'));
 // handle post to /vote
 app.post('/vote', function(req, res){
    handleVote("posted", req.ip, req.body.vote);
-   res.end() // done
+   res.end();
+});
+
+// handle download of audit log
+app.get('/download', function(req, res){
+  res.download(auditFilename); // Set disposition and send it.
 });
 
 function handleVote(id, ip, voteKey) {
-    tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
-    console.log("TALLY: " + JSON.stringify(tally));
+   // tally[voteKey] = (voteKey in tally) ? tally[voteKey]+1:1;
+   tally[voteKey] = ((tally[voteKey] || 0)) + 1;
+   console.log("TALLY: " + JSON.stringify(tally));
 		
     var vote = {vote:voteKey, id:id, ip:ip, timestamp:Date.now()};
 		
-		broadcastVote(vote);
+	broadcastVote(vote);
 		
     log.write(JSON.stringify(vote)+'\n','utf8', function (err)
       {
-        if (err) throw err
+        if (err) throw err;
       });
 }
 
